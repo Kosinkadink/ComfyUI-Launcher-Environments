@@ -196,10 +196,10 @@ jobs:
           PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            FILENAME="${ARCHIVE_BASE}.7z"
-          else
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
             FILENAME="${ARCHIVE_BASE}.tar.gz"
+          else
+            FILENAME="${ARCHIVE_BASE}.7z"
           fi
           "$PYTHON" -c "
           import json
@@ -223,11 +223,11 @@ jobs:
         shell: bash
         run: |
           ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
+          if [[ "${{ runner.os }}" == "macOS" ]]; then
+            tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json
+          else
             7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
               "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json
-          else
-            tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json
           fi
 
       - name: Report archive size
@@ -247,6 +247,7 @@ jobs:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
           files: comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
           fail_on_unmatched_files: false
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -280,5 +281,6 @@ jobs:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
           files: manifests.json
           fail_on_unmatched_files: false
+          draft: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
