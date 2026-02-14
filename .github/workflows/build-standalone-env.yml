@@ -37,14 +37,14 @@ jobs:
             os: windows-latest
             python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-nvidia.txt
-          - id: win-nvidia-cu128
-            os: windows-latest
-            python_platform: x86_64-pc-windows-msvc
-            vendor_requirements: requirements-nvidia-cu128.txt
-          - id: win-nvidia-cu126
-            os: windows-latest
-            python_platform: x86_64-pc-windows-msvc
-            vendor_requirements: requirements-nvidia-cu126.txt
+          # - id: win-nvidia-cu128
+          #   os: windows-latest
+          #   python_platform: x86_64-pc-windows-msvc
+          #   vendor_requirements: requirements-nvidia-cu128.txt
+          # - id: win-nvidia-cu126
+          #   os: windows-latest
+          #   python_platform: x86_64-pc-windows-msvc
+          #   vendor_requirements: requirements-nvidia-cu126.txt
           - id: win-intel-xpu
             os: windows-latest
             python_platform: x86_64-pc-windows-msvc
