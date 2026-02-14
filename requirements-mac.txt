@@ -1,0 +1,5 @@
+# macOS requirements (MPS - Apple Silicon)
+
+torch
+torchvision
+torchaudio

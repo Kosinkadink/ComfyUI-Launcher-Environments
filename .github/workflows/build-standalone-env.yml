@@ -32,22 +32,45 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Windows
           - id: win-nvidia
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-nvidia.txt
           - id: win-nvidia-cu128
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-nvidia-cu128.txt
           - id: win-nvidia-cu126
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-nvidia-cu126.txt
           - id: win-intel-xpu
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-intel.txt
           # AMD universal ROCm 7.2 package only provides Python 3.12 wheels
           - id: win-amd
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-amd-win.txt
             python_version: "3.12.12"
           - id: win-cpu
+            os: windows-latest
+            python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-cpu.txt
+          # Linux
+          - id: linux-nvidia
+            os: ubuntu-latest
+            python_platform: x86_64-unknown-linux-gnu
+            vendor_requirements: requirements-nvidia.txt
+          # macOS
+          - id: mac-mps
+            os: macos-latest
+            python_platform: aarch64-apple-darwin
+            vendor_requirements: requirements-mac.txt
 
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     name: Build ${{ matrix.id }}
 
     steps:
@@ -60,7 +83,7 @@ jobs:
         run: |
           REF="${{ inputs.comfyui_ref }}"
           if [[ -z "$REF" ]]; then
-            REF=$(curl -s https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest | python -c "import sys,json; print(json.load(sys.stdin)['tag_name'])")
+            REF=$(curl -s https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest | jq -r '.tag_name')
             echo "Auto-detected latest stable release: $REF"
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
@@ -70,7 +93,7 @@ jobs:
         run: |
           PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
           PBS_TAG="${{ inputs.pbs_release }}"
-          ARCHIVE_NAME="cpython-${PYTHON_VER}+${PBS_TAG}-x86_64-pc-windows-msvc-install_only.tar.gz"
+          ARCHIVE_NAME="cpython-${PYTHON_VER}+${PBS_TAG}-${{ matrix.python_platform }}-install_only.tar.gz"
           DOWNLOAD_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${ARCHIVE_NAME}"
 
           echo "Downloading: ${DOWNLOAD_URL}"
@@ -99,7 +122,12 @@ jobs:
       - name: Install dependencies into standalone Python
         shell: bash
         run: |
-          PYTHON="standalone-env/python.exe"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            PYTHON="standalone-env/python.exe"
+          else
+            PYTHON="standalone-env/bin/python3"
+            chmod +x "$PYTHON"
+          fi
 
           "$PYTHON" -m ensurepip --upgrade 2>/dev/null || true
           "$PYTHON" -m pip install --upgrade pip
@@ -108,15 +136,32 @@ jobs:
       - name: Bundle uv
         shell: bash
         run: |
-          curl -L -o uv.zip "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
-          unzip uv.zip -d uv-extract
-          cp uv-extract/uv.exe standalone-env/
-          rm -rf uv.zip uv-extract
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            UV_ARCHIVE="uv-x86_64-pc-windows-msvc.zip"
+            curl -L -o uv.zip "https://github.com/astral-sh/uv/releases/latest/download/${UV_ARCHIVE}"
+            unzip uv.zip -d uv-extract
+            cp uv-extract/uv.exe standalone-env/
+          elif [[ "${{ runner.os }}" == "macOS" ]]; then
+            UV_ARCHIVE="uv-aarch64-apple-darwin.tar.gz"
+            curl -L -o uv.tar.gz "https://github.com/astral-sh/uv/releases/latest/download/${UV_ARCHIVE}"
+            mkdir -p uv-extract && tar -xzf uv.tar.gz -C uv-extract --strip-components=1
+            cp uv-extract/uv standalone-env/bin/
+          else
+            UV_ARCHIVE="uv-x86_64-unknown-linux-gnu.tar.gz"
+            curl -L -o uv.tar.gz "https://github.com/astral-sh/uv/releases/latest/download/${UV_ARCHIVE}"
+            mkdir -p uv-extract && tar -xzf uv.tar.gz -C uv-extract --strip-components=1
+            cp uv-extract/uv standalone-env/bin/
+          fi
+          rm -rf uv.zip uv.tar.gz uv-extract
 
       - name: Strip unnecessary files
         shell: bash
         run: |
-          SITE_PACKAGES="standalone-env/Lib/site-packages"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            SITE_PACKAGES="standalone-env/Lib/site-packages"
+          else
+            SITE_PACKAGES=$(find standalone-env/lib -name site-packages -type d | head -1)
+          fi
           echo "Stripping from: $SITE_PACKAGES"
 
           # Remove large unnecessary torch files
@@ -141,10 +186,16 @@ jobs:
         shell: bash
         run: |
           COMFYUI_COMMIT=$(git -C ComfyUI rev-parse HEAD)
-          UV_VERSION=$(standalone-env/uv.exe --version | awk '{print $2}')
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            PYTHON="standalone-env/python.exe"
+            UV_VERSION=$(standalone-env/uv.exe --version | awk '{print $2}')
+          else
+            PYTHON="standalone-env/bin/python3"
+            UV_VERSION=$(standalone-env/bin/uv --version | awk '{print $2}')
+          fi
           PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          python -c "
+          "$PYTHON" -c "
           import json
           manifest = {
               'id': '${{ matrix.id }}',
@@ -164,14 +215,18 @@ jobs:
       - name: Package archive
         shell: bash
         run: |
-          7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
-            "comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z" \
-            standalone-env ComfyUI manifest.json
+          ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
+              "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json
+          else
+            tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json
+          fi
 
       - name: Report archive size
         shell: bash
         run: |
-          ls -lh comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z
+          ls -lh comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -183,7 +238,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name || inputs.release_tag }}
-          files: comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z
+          files: comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
