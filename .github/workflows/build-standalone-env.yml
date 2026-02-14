@@ -195,10 +195,17 @@ jobs:
           fi
           PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            FILENAME="${ARCHIVE_BASE}.7z"
+          else
+            FILENAME="${ARCHIVE_BASE}.tar.gz"
+          fi
           "$PYTHON" -c "
           import json
           manifest = {
               'id': '${{ matrix.id }}',
+              'filename': '${FILENAME}',
               'comfyui_ref': '${{ steps.comfyui.outputs.ref }}',
               'comfyui_commit': '${COMFYUI_COMMIT}',
               'python_version': '${PYTHON_VER}',
