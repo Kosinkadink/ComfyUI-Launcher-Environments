@@ -43,7 +43,7 @@ jobs:
           # AMD universal ROCm 7.2 package only provides Python 3.12 wheels
           - id: win-amd
             vendor_requirements: requirements-amd-win.txt
-            python_version: "3.12.10"
+            python_version: "3.12.12"
           - id: win-cpu
             vendor_requirements: requirements-cpu.txt
 
