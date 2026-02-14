@@ -1,0 +1,8 @@
+# AMD GPU requirements (ROCm, RDNA 3 - RX 7000 series)
+
+--index-url https://repo.amd.com/rocm/whl/gfx110X-dgpu/
+--extra-index-url https://pypi.org/simple
+
+torch
+torchvision
+torchaudio

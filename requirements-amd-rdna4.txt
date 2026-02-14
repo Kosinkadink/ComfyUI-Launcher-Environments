@@ -1,0 +1,8 @@
+# AMD GPU requirements (ROCm, RDNA 4 - RX 9000 series)
+
+--index-url https://repo.amd.com/rocm/whl/gfx120X-all/
+--extra-index-url https://pypi.org/simple
+
+torch
+torchvision
+torchaudio

@@ -1,0 +1,8 @@
+# AMD GPU requirements (ROCm, RDNA 3.5 - Strix Halo / Ryzen AI Max+)
+
+--index-url https://repo.amd.com/rocm/whl/gfx1151/
+--extra-index-url https://pypi.org/simple
+
+torch
+torchvision
+torchaudio

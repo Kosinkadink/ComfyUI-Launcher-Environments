@@ -1,0 +1,11 @@
+# AMD GPU requirements (ROCm)
+#
+# Note: This is for AMD GPUs with ROCm support.
+# For experimental Windows/Linux support on RDNA 3/3.5/4, see README.md
+
+--index-url https://download.pytorch.org/whl/rocm7.1
+--extra-index-url https://pypi.org/simple
+
+torch
+torchvision
+torchaudio
