@@ -164,22 +164,39 @@ jobs:
           fi
           echo "Stripping from: $SITE_PACKAGES"
 
-          # Remove large unnecessary torch files
-          rm -f "$SITE_PACKAGES/torch/lib/dnnl.lib" 2>/dev/null || true
-          rm -f "$SITE_PACKAGES/torch/lib/libprotoc.lib" 2>/dev/null || true
-          rm -f "$SITE_PACKAGES/torch/lib/libprotobuf.lib" 2>/dev/null || true
+          # Remove unnecessary lib files (Windows .lib, Linux/Mac .a)
+          rm -f "$SITE_PACKAGES/torch/lib/"*.lib 2>/dev/null || true
+          find "$SITE_PACKAGES" -name "*.a" -delete 2>/dev/null || true
+
+          # Remove C++ headers and cmake files
+          rm -rf "$SITE_PACKAGES/torch/include" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/torch/share" 2>/dev/null || true
+
+          # Remove unused torch components
+          rm -rf "$SITE_PACKAGES/caffe2" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/functorch" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/torch/_inductor/autoheuristic/datasets" 2>/dev/null || true
 
           # Remove test directories
           find "$SITE_PACKAGES" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
           find "$SITE_PACKAGES" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
 
-          # Remove __pycache__
+          # Remove __pycache__ and .pyc files
           find standalone-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+          find standalone-env -name "*.pyc" -delete 2>/dev/null || true
 
           # Remove .dist-info
           find "$SITE_PACKAGES" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
 
-          echo "Final environment size:"
+          # Strip debug symbols from shared libraries (Linux/Mac)
+          if [[ "${{ runner.os }}" != "Windows" ]]; then
+            find standalone-env -name "*.so" -exec strip --strip-debug {} \; 2>/dev/null || true
+            find standalone-env -name "*.dylib" -exec strip -x {} \; 2>/dev/null || true
+          fi
+
+          echo "=== Largest directories in site-packages ==="
+          du -sh "$SITE_PACKAGES"/*/ 2>/dev/null | sort -rh | head -20
+          echo "=== Final environment size ==="
           du -sh standalone-env
 
       - name: Generate build manifest
