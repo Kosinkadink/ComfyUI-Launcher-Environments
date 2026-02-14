@@ -164,7 +164,7 @@ jobs:
       - name: Package archive
         shell: bash
         run: |
-          7z a -t7z -m0=lzma2 -mx=7 -ms=on \
+          7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
             "comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z" \
             standalone-env ComfyUI manifest.json
 
