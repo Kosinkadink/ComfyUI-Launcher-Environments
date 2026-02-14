@@ -89,12 +89,9 @@ jobs:
       - name: Fetch and prepare requirements
         shell: bash
         run: |
-          # Filter out comfyui-* packages (installed with ComfyUI source)
-          grep -v -i "^comfyui" ComfyUI/requirements.txt > requirements_deps.txt || true
-
-          # Build final requirements: vendor-specific + filtered ComfyUI deps
+          # Build final requirements: vendor-specific + ComfyUI deps
           cp "${{ matrix.vendor_requirements }}" requirements_final.txt
-          echo "-r requirements_deps.txt" >> requirements_final.txt
+          echo "-r ComfyUI/requirements.txt" >> requirements_final.txt
 
           echo "=== requirements_final.txt ==="
           cat requirements_final.txt
@@ -140,23 +137,86 @@ jobs:
           echo "Final environment size:"
           du -sh standalone-env
 
+      - name: Generate build manifest
+        shell: bash
+        run: |
+          COMFYUI_COMMIT=$(git -C ComfyUI rev-parse HEAD)
+          UV_VERSION=$(standalone-env/uv.exe --version | awk '{print $2}')
+          PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
+          BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          python -c "
+          import json
+          manifest = {
+              'id': '${{ matrix.id }}',
+              'comfyui_ref': '${{ steps.comfyui.outputs.ref }}',
+              'comfyui_commit': '${COMFYUI_COMMIT}',
+              'python_version': '${PYTHON_VER}',
+              'pbs_release': '${{ inputs.pbs_release }}',
+              'uv_version': '${UV_VERSION}',
+              'vendor_requirements': '${{ matrix.vendor_requirements }}',
+              'build_date': '${BUILD_DATE}',
+          }
+          print(json.dumps(manifest, indent=2))
+          " > manifest.json
+          echo "=== manifest.json ==="
+          cat manifest.json
+
       - name: Package archive
         shell: bash
         run: |
           7z a -t7z -m0=lzma2 -mx=7 -ms=on \
             "comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z" \
-            standalone-env ComfyUI
+            standalone-env ComfyUI manifest.json
 
       - name: Report archive size
         shell: bash
         run: |
           ls -lh comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z
 
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-${{ matrix.id }}
+          path: manifest.json
+
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name || inputs.release_tag }}
           files: comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.7z
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-manifests:
+    needs: build
+    runs-on: ubuntu-latest
+    name: Publish manifests
+    steps:
+      - name: Download all manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: manifest-*
+
+      - name: Combine manifests
+        shell: bash
+        run: |
+          python -c "
+          import json, glob
+          manifests = []
+          for f in sorted(glob.glob('manifest-*/manifest.json')):
+              with open(f) as fh:
+                  manifests.append(json.load(fh))
+          print(json.dumps(manifests, indent=2))
+          " > manifests.json
+          echo "=== manifests.json ==="
+          cat manifests.json
+
+      - name: Upload manifests to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name || inputs.release_tag }}
+          files: manifests.json
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
