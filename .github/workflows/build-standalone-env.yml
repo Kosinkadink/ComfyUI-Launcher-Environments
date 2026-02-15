@@ -60,10 +60,10 @@ jobs:
             python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-cpu.txt
           # Linux
-          - id: linux-nvidia
-            os: ubuntu-latest
-            python_platform: x86_64-unknown-linux-gnu
-            vendor_requirements: requirements-nvidia.txt
+          # - id: linux-nvidia
+          #   os: ubuntu-latest
+          #   python_platform: x86_64-unknown-linux-gnu
+          #   vendor_requirements: requirements-nvidia.txt
           # macOS
           - id: mac-mps
             os: macos-latest
