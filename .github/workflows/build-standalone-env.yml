@@ -81,7 +81,7 @@ jobs:
           if [[ -z "$REF" ]]; then
             MAX_ATTEMPTS=$([[ "${{ runner.os }}" == "macOS" ]] && echo 6 || echo 3)
             for i in $(seq 1 $MAX_ATTEMPTS); do
-              REF=$(curl -sf --retry 3 https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || true
+              REF=$(curl -sf --retry 3 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || true
               if [[ -n "$REF" ]]; then break; fi
               echo "Attempt $i/$MAX_ATTEMPTS failed, retrying in 15s..."
               sleep 15
@@ -109,11 +109,20 @@ jobs:
           mv python-extract/python standalone-env
 
       - name: Clone ComfyUI
-        uses: actions/checkout@v4
-        with:
-          repository: Comfy-Org/ComfyUI
-          ref: ${{ steps.comfyui.outputs.ref }}
-          path: ComfyUI
+        shell: bash
+        run: |
+          REF="${{ steps.comfyui.outputs.ref }}"
+          MAX_ATTEMPTS=$([[ "${{ runner.os }}" == "macOS" ]] && echo 6 || echo 3)
+          for i in $(seq 1 $MAX_ATTEMPTS); do
+            git clone --depth 1 --branch "$REF" https://github.com/Comfy-Org/ComfyUI.git ComfyUI && break
+            echo "Clone attempt $i/$MAX_ATTEMPTS failed, retrying in 15s..."
+            rm -rf ComfyUI
+            sleep 15
+          done
+          if [ ! -d "ComfyUI" ]; then
+            echo "::error::Failed to clone ComfyUI after $MAX_ATTEMPTS attempts"
+            exit 1
+          fi
 
       - name: Fetch and prepare requirements
         shell: bash
