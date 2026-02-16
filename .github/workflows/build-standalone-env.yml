@@ -6,14 +6,6 @@ on:
       - "v*"
   workflow_dispatch:
     inputs:
-      python_version:
-        description: "Python version (e.g. 3.12.12)"
-        required: true
-        default: "3.13.12"
-      pbs_release:
-        description: "python-build-standalone release tag (e.g. 20260211)"
-        required: true
-        default: "20260211"
       comfyui_ref:
         description: "ComfyUI branch/tag (leave empty for latest stable release)"
         required: false
@@ -22,6 +14,10 @@ on:
         description: "Tag for the GitHub Release to upload to"
         required: true
         default: "standalone-v0.1.0"
+
+env:
+  PYTHON_VERSION: "3.13.12"
+  PBS_RELEASE: "20260211"
 
 permissions:
   contents: write
@@ -101,8 +97,8 @@ jobs:
       - name: Download python-build-standalone
         shell: bash
         run: |
-          PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
-          PBS_TAG="${{ inputs.pbs_release }}"
+          PYTHON_VER="${{ matrix.python_version || env.PYTHON_VERSION }}"
+          PBS_TAG="${{ env.PBS_RELEASE }}"
           ARCHIVE_NAME="cpython-${PYTHON_VER}+${PBS_TAG}-${{ matrix.python_platform }}-install_only.tar.gz"
           DOWNLOAD_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/${ARCHIVE_NAME}"
 
@@ -251,7 +247,7 @@ jobs:
             PYTHON="standalone-env/bin/python3"
             UV_VERSION=$(standalone-env/bin/uv --version | awk '{print $2}')
           fi
-          PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
+          PYTHON_VER="${{ matrix.python_version || env.PYTHON_VERSION }}"
           TORCH_VERSION=$("$PYTHON" -c "import torch; print(torch.__version__)")
           TORCHVISION_VERSION=$("$PYTHON" -c "import torchvision; print(torchvision.__version__)" 2>/dev/null || echo "N/A")
           TORCHAUDIO_VERSION=$("$PYTHON" -c "import torchaudio; print(torchaudio.__version__)" 2>/dev/null || echo "N/A")
@@ -271,7 +267,7 @@ jobs:
               'torch_version': '${TORCH_VERSION}',
               'torchvision_version': '${TORCHVISION_VERSION}',
               'torchaudio_version': '${TORCHAUDIO_VERSION}',
-              'pbs_release': '${{ inputs.pbs_release }}',
+              'pbs_release': '${{ env.PBS_RELEASE }}',
               'uv_version': '${UV_VERSION}',
               'vendor_requirements': '${{ matrix.vendor_requirements }}',
               'vendor_requirements_content': vendor_req,
