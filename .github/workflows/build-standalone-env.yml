@@ -268,6 +268,7 @@ jobs:
           comfyui_req = pathlib.Path('ComfyUI/requirements.txt').read_text().strip()
           manifest = {
               'id': '${{ matrix.id }}',
+              'version': '${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}',
               'archive_base': '${ARCHIVE_BASE}',
               'files': [],
               'comfyui_ref': '${{ steps.comfyui.outputs.ref }}',
@@ -295,7 +296,7 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           else
-            7z a -t7z -m0=lzma2 -mx=3 -mfb=32 -md=16m -ms=on \
+            7z a -t7z -m0=lzma2 -mx=3 -mfb=32 -md=16m -ms=on -mf=off \
               -v1900m \
               "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           fi
