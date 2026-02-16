@@ -174,19 +174,19 @@ jobs:
 
           # Remove unused torch components
           rm -rf "$SITE_PACKAGES/caffe2" 2>/dev/null || true
-          rm -rf "$SITE_PACKAGES/functorch" 2>/dev/null || true
           rm -rf "$SITE_PACKAGES/torch/_inductor/autoheuristic/datasets" 2>/dev/null || true
 
-          # Remove test directories
-          find "$SITE_PACKAGES" -type d -name "tests" -exec rm -rf {} + 2>/dev/null || true
-          find "$SITE_PACKAGES" -type d -name "test" -exec rm -rf {} + 2>/dev/null || true
+          # Remove test directories from known large packages
+          rm -rf "$SITE_PACKAGES/torch/testing/_internal" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/torch/test" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/transformers/tests" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/numpy/tests" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/PIL/tests" 2>/dev/null || true
+          rm -rf "$SITE_PACKAGES/scipy/tests" 2>/dev/null || true
 
           # Remove __pycache__ and .pyc files
           find standalone-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
           find standalone-env -name "*.pyc" -delete 2>/dev/null || true
-
-          # Remove .dist-info
-          find "$SITE_PACKAGES" -type d -name "*.dist-info" -exec rm -rf {} + 2>/dev/null || true
 
           # Strip debug symbols from shared libraries (Linux/Mac)
           if [[ "${{ runner.os }}" != "Windows" ]]; then
@@ -198,6 +198,28 @@ jobs:
           du -sh "$SITE_PACKAGES"/*/ 2>/dev/null | sort -rh | head -20
           echo "=== Final environment size ==="
           du -sh standalone-env
+
+      - name: Smoke test stripped environment
+        shell: bash
+        run: |
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            PYTHON="standalone-env/python.exe"
+          else
+            PYTHON="standalone-env/bin/python3"
+          fi
+
+          echo "=== Verifying core imports ==="
+          "$PYTHON" -c "
+          import torch
+          print(f'torch {torch.__version__}')
+          import tqdm
+          print(f'tqdm {tqdm.__version__}')
+          import transformers
+          print(f'transformers {transformers.__version__}')
+          import pygit2
+          print(f'pygit2 {pygit2.__version__}')
+          print('All core imports OK')
+          "
 
       - name: Generate build manifest
         shell: bash
@@ -211,6 +233,7 @@ jobs:
             UV_VERSION=$(standalone-env/bin/uv --version | awk '{print $2}')
           fi
           PYTHON_VER="${{ matrix.python_version || inputs.python_version }}"
+          TORCH_VERSION=$("$PYTHON" -c "import torch; print(torch.__version__)")
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
@@ -219,16 +242,21 @@ jobs:
             FILENAME="${ARCHIVE_BASE}.7z"
           fi
           "$PYTHON" -c "
-          import json
+          import json, pathlib
+          vendor_req = pathlib.Path('${{ matrix.vendor_requirements }}').read_text().strip()
+          comfyui_req = pathlib.Path('ComfyUI/requirements.txt').read_text().strip()
           manifest = {
               'id': '${{ matrix.id }}',
               'filename': '${FILENAME}',
               'comfyui_ref': '${{ steps.comfyui.outputs.ref }}',
               'comfyui_commit': '${COMFYUI_COMMIT}',
               'python_version': '${PYTHON_VER}',
+              'torch_version': '${TORCH_VERSION}',
               'pbs_release': '${{ inputs.pbs_release }}',
               'uv_version': '${UV_VERSION}',
               'vendor_requirements': '${{ matrix.vendor_requirements }}',
+              'vendor_requirements_content': vendor_req,
+              'comfyui_requirements_content': comfyui_req,
               'build_date': '${BUILD_DATE}',
           }
           print(json.dumps(manifest, indent=2))
@@ -241,10 +269,10 @@ jobs:
         run: |
           ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
           if [[ "${{ runner.os }}" == "macOS" ]]; then
-            tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json
+            tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           else
             7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
-              "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json
+              "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           fi
 
       - name: Report archive size
