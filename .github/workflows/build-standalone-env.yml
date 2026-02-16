@@ -130,7 +130,7 @@ jobs:
           # Build final requirements: vendor-specific + ComfyUI deps + manager deps
           cp "${{ matrix.vendor_requirements }}" requirements_final.txt
           echo "-r ComfyUI/requirements.txt" >> requirements_final.txt
-          echo "-r ComfyUI/manager-requirements.txt" >> requirements_final.txt
+          echo "-r ComfyUI/manager_requirements.txt" >> requirements_final.txt
 
           echo "=== requirements_final.txt ==="
           cat requirements_final.txt
@@ -267,7 +267,7 @@ jobs:
           import json, pathlib
           vendor_req = pathlib.Path('${{ matrix.vendor_requirements }}').read_text().strip()
           comfyui_req = pathlib.Path('ComfyUI/requirements.txt').read_text().strip()
-          manager_req = pathlib.Path('ComfyUI/manager-requirements.txt').read_text().strip()
+          manager_req = pathlib.Path('ComfyUI/manager_requirements.txt').read_text().strip()
           manifest = {
               'id': '${{ matrix.id }}',
               'version': '${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}',
