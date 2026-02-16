@@ -295,7 +295,7 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           else
-            7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on \
+            7z a -t7z -m0=lzma2 -mx=3 -mfb=32 -md=16m -ms=on \
               -v1900m \
               "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           fi
