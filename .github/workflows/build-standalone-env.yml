@@ -83,11 +83,12 @@ jobs:
         run: |
           REF="${{ inputs.comfyui_ref }}"
           if [[ -z "$REF" ]]; then
-            for i in 1 2 3; do
+            MAX_ATTEMPTS=$([[ "${{ runner.os }}" == "macOS" ]] && echo 6 || echo 3)
+            for i in $(seq 1 $MAX_ATTEMPTS); do
               REF=$(curl -sf --retry 3 https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || true
               if [[ -n "$REF" ]]; then break; fi
-              echo "Attempt $i failed, retrying in 10s..."
-              sleep 10
+              echo "Attempt $i/$MAX_ATTEMPTS failed, retrying in 15s..."
+              sleep 15
             done
             if [[ -z "$REF" ]]; then
               echo "::error::Failed to resolve latest ComfyUI release tag"
