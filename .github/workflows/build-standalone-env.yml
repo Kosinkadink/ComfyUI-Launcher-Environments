@@ -84,7 +84,7 @@ jobs:
           REF="${{ inputs.comfyui_ref }}"
           if [[ -z "$REF" ]]; then
             for i in 1 2 3; do
-              REF=$(curl -sf --retry 3 https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest | jq -r '.tag_name // empty')
+              REF=$(curl -sf --retry 3 https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || true
               if [[ -n "$REF" ]]; then break; fi
               echo "Attempt $i failed, retrying in 10s..."
               sleep 10
