@@ -164,6 +164,22 @@ jobs:
           fi
           echo "Stripping from: $SITE_PACKAGES"
 
+          # Report test directory sizes before stripping
+          echo "=== Test directory sizes ==="
+          for test_dir in \
+            "$SITE_PACKAGES/torch/test" \
+            "$SITE_PACKAGES/transformers/tests" \
+            "$SITE_PACKAGES/numpy/tests" \
+            "$SITE_PACKAGES/PIL/tests" \
+            "$SITE_PACKAGES/scipy/tests"; do
+            if [ -d "$test_dir" ]; then
+              echo "$(du -sh "$test_dir")"
+            else
+              echo "$test_dir: not found"
+            fi
+          done
+          echo "==========================="
+
           # Remove unnecessary lib files (Windows .lib, Linux/Mac .a)
           rm -f "$SITE_PACKAGES/torch/lib/"*.lib 2>/dev/null || true
           find "$SITE_PACKAGES" -name "*.a" -delete 2>/dev/null || true
@@ -175,14 +191,7 @@ jobs:
           # Remove unused torch components
           rm -rf "$SITE_PACKAGES/caffe2" 2>/dev/null || true
           rm -rf "$SITE_PACKAGES/torch/_inductor/autoheuristic/datasets" 2>/dev/null || true
-
-          # Remove test directories from known large packages
-          rm -rf "$SITE_PACKAGES/torch/testing/_internal" 2>/dev/null || true
           rm -rf "$SITE_PACKAGES/torch/test" 2>/dev/null || true
-          rm -rf "$SITE_PACKAGES/transformers/tests" 2>/dev/null || true
-          rm -rf "$SITE_PACKAGES/numpy/tests" 2>/dev/null || true
-          rm -rf "$SITE_PACKAGES/PIL/tests" 2>/dev/null || true
-          rm -rf "$SITE_PACKAGES/scipy/tests" 2>/dev/null || true
 
           # Remove __pycache__ and .pyc files
           find standalone-env -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
