@@ -83,7 +83,11 @@ jobs:
         run: |
           REF="${{ inputs.comfyui_ref }}"
           if [[ -z "$REF" ]]; then
-            REF=$(curl -s https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest | jq -r '.tag_name')
+            REF=$(curl -s https://api.github.com/repos/Comfy-Org/ComfyUI/releases/latest | jq -r '.tag_name // empty')
+            if [[ -z "$REF" ]]; then
+              echo "::error::Failed to resolve latest ComfyUI release tag"
+              exit 1
+            fi
             echo "Auto-detected latest stable release: $REF"
           fi
           echo "ref=$REF" >> "$GITHUB_OUTPUT"
