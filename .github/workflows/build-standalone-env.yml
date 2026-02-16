@@ -60,10 +60,10 @@ jobs:
             python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-cpu.txt
           # Linux
-          # - id: linux-nvidia
-          #   os: ubuntu-latest
-          #   python_platform: x86_64-unknown-linux-gnu
-          #   vendor_requirements: requirements-nvidia.txt
+          - id: linux-nvidia
+            os: ubuntu-latest
+            python_platform: x86_64-unknown-linux-gnu
+            vendor_requirements: requirements-nvidia.txt
           # macOS
           - id: mac-mps
             os: macos-latest
@@ -257,18 +257,14 @@ jobs:
           TORCHAUDIO_VERSION=$("$PYTHON" -c "import torchaudio; print(torchaudio.__version__)" 2>/dev/null || echo "N/A")
           BUILD_DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
-          if [[ "${{ runner.os }}" == "macOS" ]]; then
-            FILENAME="${ARCHIVE_BASE}.tar.gz"
-          else
-            FILENAME="${ARCHIVE_BASE}.7z"
-          fi
           "$PYTHON" -c "
           import json, pathlib
           vendor_req = pathlib.Path('${{ matrix.vendor_requirements }}').read_text().strip()
           comfyui_req = pathlib.Path('ComfyUI/requirements.txt').read_text().strip()
           manifest = {
               'id': '${{ matrix.id }}',
-              'filename': '${FILENAME}',
+              'archive_base': '${ARCHIVE_BASE}',
+              'files': [],
               'comfyui_ref': '${{ steps.comfyui.outputs.ref }}',
               'comfyui_commit': '${COMFYUI_COMMIT}',
               'python_version': '${PYTHON_VER}',
@@ -284,7 +280,7 @@ jobs:
           }
           print(json.dumps(manifest, indent=2))
           " > manifest.json
-          echo "=== manifest.json ==="
+          echo "=== manifest.json (pre-archive) ==="
           cat manifest.json
 
       - name: Package archive
@@ -294,14 +290,30 @@ jobs:
           if [[ "${{ runner.os }}" == "macOS" ]]; then
             tar -czf "${ARCHIVE_BASE}.tar.gz" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           else
-            7z a -t7z -m0=lzma2 -mx=9 -mfb=128 -md=768m -ms=on -mf=BCJ2 \
+            7z a -t7z -m0=lzma2 -mx=5 -mfb=64 -md=64m -ms=on \
+              -v1900m \
               "${ARCHIVE_BASE}.7z" standalone-env ComfyUI manifest.json "${{ matrix.vendor_requirements }}"
           fi
 
-      - name: Report archive size
+      - name: Populate manifest files list
         shell: bash
         run: |
-          ls -lh comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
+          ARCHIVE_BASE="comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}"
+          FILES=$(ls -1 "${ARCHIVE_BASE}".* 2>/dev/null | sort)
+          echo "=== Archive files ==="
+          ls -lh ${ARCHIVE_BASE}.* 2>/dev/null
+          python3 -c "
+          import json
+          files = '''${FILES}'''.strip().split('\n')
+          files = [f.strip() for f in files if f.strip()]
+          with open('manifest.json', 'r') as fh:
+              manifest = json.load(fh)
+          manifest['files'] = files
+          with open('manifest.json', 'w') as fh:
+              json.dump(manifest, fh, indent=2)
+          "
+          echo "=== manifest.json ==="
+          cat manifest.json
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -313,7 +325,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || inputs.release_tag }}
-          files: comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
+          files: |
+            comfyui-standalone-${{ matrix.id }}-${{ steps.comfyui.outputs.ref }}.*
           fail_on_unmatched_files: false
           draft: true
         env:
