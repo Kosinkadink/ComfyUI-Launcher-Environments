@@ -45,7 +45,7 @@ jobs:
             os: windows-latest
             python_platform: x86_64-pc-windows-msvc
             vendor_requirements: requirements-intel.txt
-          # AMD universal ROCm 7.2 package only provides Python 3.12 wheels
+          # AMD universal ROCm 7.2.1 package only provides Python 3.12 wheels
           - id: win-amd
             os: windows-latest
             python_platform: x86_64-pc-windows-msvc
